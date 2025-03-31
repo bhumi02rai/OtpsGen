@@ -1,9 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException, GoneException } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const OTP_FILE_PATH = path.join(__dirname, 'otp.json');
-console.log(OTP_FILE_PATH);
+const OTP_FILE_PATH = path.join(__dirname, '../../otp.json');
+
 export interface OtpData {
   userId: string;
   otp: string;
@@ -40,10 +40,7 @@ export class OtpsService {
     const otpStore = this.readOtpStore();
     otpStore[userId] = { userId, otp, generatedAt };
     
-    console.log('Storing OTP:', otpStore); 
-    
     this.writeOtpStore(otpStore);
-
     return { userId, otp, generatedAt };
   }
 
@@ -51,13 +48,21 @@ export class OtpsService {
     const otpStore = this.readOtpStore();
     const storedOtpData = otpStore[userId];
 
-    if (!storedOtpData) return 'Invalid OTP';
+    if (!storedOtpData) {
+      throw new BadRequestException({ message: 'Invalid OTP' });
+    }
 
     const now = new Date();
     const diff = (now.getTime() - new Date(storedOtpData.generatedAt).getTime()) / 1000;
 
-    if (diff > 600) return 'OTP expired';
+    if (diff > 600) {
+      throw new GoneException({ message: 'OTP expired' });
+    }
 
-    return storedOtpData.otp === otp ? 'OTP verified' : 'Incorrect OTP';
+    if (storedOtpData.otp !== otp) {
+      throw new BadRequestException({ message: 'Incorrect OTP' });
+    }
+
+    return 'OTP verified';
   }
 }
